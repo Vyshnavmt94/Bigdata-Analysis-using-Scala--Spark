@@ -1,0 +1,730 @@
+
+
+=====================================================Task 1: Reading, merging and Data cleaning=========================================================
+
+
+scala> var companies = spark.read.format("csv").option("sep","\t").option("header","True").option("encoding","ISO-8859-1").load("companies.txt")
+		companies: org.apache.spark.sql.DataFrame = [permalink: string, name: string ... 8 more fields]
+
+scala> companies.show
+		+--------------------+--------+--------------------+--------------------+---------+------------+----------+----------+-------------+----------+
+		|           permalink|    name|        homepage_url|       category_list|   status|country_code|state_code|    region|         city|founded_at|
+		+--------------------+--------+--------------------+--------------------+---------+------------+----------+----------+-------------+----------+
+		| /Organization/-Fame|   #fame|  http://livfame.com|               Media|operating|         IND|        16|    Mumbai|       Mumbai|      null|
+		|/Organization/-Qo...|:Qounter|http://www.qounte...|Application Platf...|operating|         USA|        DE|DE - Other|Delaware City|04-09-2014|
+		+--------------------+--------+--------------------+--------------------+---------+------------+----------+----------+-------------+----------+
+
+
+scala> companies = companies.withColumn("permalink",lower(col("permalink")))
+		companies: org.apache.spark.sql.DataFrame = [permalink: string, name: string ... 8 more fields]
+
+scala> companies.show(2)
+		+--------------------+--------+--------------------+--------------------+---------+------------+----------+----------+-------------+----------+
+		|           permalink|    name|        homepage_url|       category_list|   status|country_code|state_code|    region|         city|founded_at|
+		+--------------------+--------+--------------------+--------------------+---------+------------+----------+----------+-------------+----------+
+		| /organization/-fame|   #fame|  http://livfame.com|               Media|operating|         IND|        16|    Mumbai|       Mumbai|      null|
+		|/organization/-qo...|:Qounter|http://www.qounte...|Application Platf...|operating|         USA|        DE|DE - Other|Delaware City|04-09-2014|
+		+--------------------+--------+--------------------+--------------------+---------+------------+----------+----------+-------------+----------+
+		only showing top 2 rows
+
+
+scala> companies.select("permalink").distinct.count()
+		res57: Long = 66368
+
+scala> var rounds =spark.read.format("csv").option("header","True").option("encoding","ISO-8859-1").load("rounds2.csv")
+		rounds: org.apache.spark.sql.DataFrame = [company_permalink: string, funding_round_permalink: string ... 4 more fields]
+
+scala> rounds.show(2)
+		+--------------------+-----------------------+------------------+------------------+----------+-----------------+
+		|   company_permalink|funding_round_permalink|funding_round_type|funding_round_code| funded_at|raised_amount_usd|
+		+--------------------+-----------------------+------------------+------------------+----------+-----------------+
+		| /organization/-fame|   /funding-round/9a...|           venture|                 B|05-01-2015|         10000000|
+		|/ORGANIZATION/-QO...|   /funding-round/22...|           venture|                 A|14-10-2014|             null|
+		+--------------------+-----------------------+------------------+------------------+----------+-----------------+
+		only showing top 2 rows
+
+
+scala> rounds = rounds.withColumn("company_permalink",lower(col("company_permalink")))
+		rounds: org.apache.spark.sql.DataFrame = [company_permalink: string, funding_round_permalink: string ... 4 more fields]
+
+scala> rounds.show(2)
+		+--------------------+-----------------------+------------------+------------------+----------+-----------------+
+		|   company_permalink|funding_round_permalink|funding_round_type|funding_round_code| funded_at|raised_amount_usd|
+		+--------------------+-----------------------+------------------+------------------+----------+-----------------+
+		| /organization/-fame|   /funding-round/9a...|           venture|                 B|05-01-2015|         10000000|
+		|/organization/-qo...|   /funding-round/22...|           venture|                 A|14-10-2014|             null|
+		+--------------------+-----------------------+------------------+------------------+----------+-----------------+
+		only showing top 2 rows
+
+
+scala> rounds.select("company_permalink").distinct.count()
+		res60: Long = 66370
+
+
+####2 columns missing in companies
+
+
+scala> rounds = rounds.withColumnRenamed("company_permalink","permalink")
+		rounds: org.apache.spark.sql.DataFrame = [permalink: string, funding_round_permalink: string ... 4 more fields]
+
+scala> rounds.show(2)
+		+--------------------+-----------------------+------------------+------------------+----------+-----------------+
+		|           permalink|funding_round_permalink|funding_round_type|funding_round_code| funded_at|raised_amount_usd|
+		+--------------------+-----------------------+------------------+------------------+----------+-----------------+
+		| /organization/-fame|   /funding-round/9a...|           venture|                 B|05-01-2015|         10000000|
+		|/organization/-qo...|   /funding-round/22...|           venture|                 A|14-10-2014|             null|
+		+--------------------+-----------------------+------------------+------------------+----------+-----------------+
+
+
+scala> var master_frame = rounds.join(companies, Seq("permalink"), "inner")
+		master: org.apache.spark.sql.DataFrame = [permalink: string, funding_round_permalink: string ... 13 more fields]
+
+scala> master_frame.show
+
+scala> master_frame.columns
+
+scala> master_frame.count()
+		res4: Long = 114942
+
+scala> var master = master_frame.drop("funding_round_code", "funding_round_permalink", "funded_at","permalink", "homepage_url","state_code","region", "city", "founded_at","status")
+		master: org.apache.spark.sql.DataFrame = [funding_round_type: string, raised_amount_usd: string ... 3 more fields]
+
+scala> master.count()
+		res30: Long = 114942
+
+scala> master = master.na.drop()
+		master: org.apache.spark.sql.DataFrame = [funding_round_type: string, raised_amount_usd: string ... 3 more fields]
+
+scala> master.count()
+		res31: Long = 88529
+
+scala> master.show(2)
+		+------------------+-----------------+--------+--------------------+------------+
+		|funding_round_type|raised_amount_usd|    name|       category_list|country_code|
+		+------------------+-----------------+--------+--------------------+------------+
+		|           venture|         10000000|   #fame|               Media|         IND|
+		|              seed|           700000|:Qounter|Application Platf...|         USA|
+		+------------------+-----------------+--------+--------------------+------------+
+		only showing top 2 rows
+
+
+
+
+===============================================================Task 2: Funding Type Analysis================================================================
+
+===============================================================Observing the unique funding_round_type======================================================
+
+
+
+scala> master.groupBy("funding_round_type").count().orderBy(desc("count")).show
+		+--------------------+-----+
+		|  funding_round_type|count|
+		+--------------------+-----+
+		|             venture|47809|
+		|                seed|21095|
+		|      debt_financing| 6506|
+		|               angel| 4400|
+		|               grant| 1939|
+		|      private_equity| 1820|
+		|         undisclosed| 1345|
+		|    convertible_note| 1320|
+		| equity_crowdfunding| 1128|
+		|     post_ipo_equity|  598|
+		|product_crowdfunding|  330|
+		|       post_ipo_debt|  151|
+		|non_equity_assist...|   60|
+		|    secondary_market|   28|
+		+--------------------+-----+
+
+scala> master = master.withColumn("raised_amount_usd",$"raised_amount_usd".cast("float"))
+		master: org.apache.spark.sql.DataFrame = [funding_round_type: string, raised_amount_usd: float ... 3 more fields]
+
+scala> master.show(2)
+		+------------------+-----------------+--------+--------------------+------------+
+		|funding_round_type|raised_amount_usd|    name|       category_list|country_code|
+		+------------------+-----------------+--------+--------------------+------------+
+		|           venture|            1.0E7|   #fame|               Media|         IND|
+		|              seed|         700000.0|:Qounter|Application Platf...|         USA|
+		+------------------+-----------------+--------+--------------------+------------+
+		only showing top 2 rows
+
+
+
+scala> master.groupBy("funding_round_type").agg(sum("raised_amount_usd")).orderBy(desc("sum(raised_amount_usd)")).show
+		+--------------------+----------------------+
+		|  funding_round_type|sum(raised_amount_usd)|
+		+--------------------+----------------------+
+		|             venture|      5.42518329903E11|
+		|      private_equity|      1.30617552109E11|
+		|      debt_financing|       8.7900668728E10|
+		|     post_ipo_equity|       3.8461564712E10|
+		|       post_ipo_debt|       2.0582187579E10|
+		|         undisclosed|       1.7439251878E10|
+		|                seed|       1.5774707731E10|
+		|               grant|         8.750122001E9|
+		|               angel|         4.274925129E9|
+		|    secondary_market|         2.364278935E9|
+		|    convertible_note|         1.765086374E9|
+		| equity_crowdfunding|          5.75164907E8|
+		|product_crowdfunding|           4.4656488E8|
+		|non_equity_assist...|           2.8845203E7|
+		+--------------------+----------------------+
+
+
+scala> master.groupBy("funding_round_type").agg(avg("raised_amount_usd")).orderBy(desc("avg(raised_amount_usd)")).show
+		+--------------------+----------------------+
+		|  funding_round_type|avg(raised_amount_usd)|
+		+--------------------+----------------------+
+		|       post_ipo_debt|  1.3630587800662252E8|
+		|    secondary_market|   8.443853339285715E7|
+		|      private_equity|   7.176788577417582E7|
+		|     post_ipo_equity|   6.431699784615385E7|
+		|      debt_financing|  1.3510708381186597E7|
+		|         undisclosed|  1.2965986526394052E7|
+		|             venture|  1.1347619274676315E7|
+		|               grant|      4512698.29860753|
+		|product_crowdfunding|    1353226.9090909092|
+		|    convertible_note|     1337186.646969697|
+		|               angel|     971573.8929545454|
+		|                seed|     747793.6824365964|
+		| equity_crowdfunding|    509897.96719858155|
+		|non_equity_assist...|    480753.38333333336|
+		+--------------------+----------------------+
+
+
+scala> val fil = List("venture", "angel", "seed", "private_equity")
+		fil: List[String] = List(venture, angel, seed, private_equity)
+
+
+scala> master.filter($"funding_round_type".isin(fil:_*)).show(3)
+		+------------------+-----------------+--------+--------------------+------------+
+		|funding_round_type|raised_amount_usd|    name|       category_list|country_code|
+		+------------------+-----------------+--------+--------------------+------------+
+		|           venture|            1.0E7|   #fame|               Media|         IND|
+		|              seed|         700000.0|:Qounter|Application Platf...|         USA|
+		|           venture|        2000000.0| 0-6.com|         Curated Web|         CHN|
+		+------------------+-----------------+--------+--------------------+------------+
+		only showing top 3 rows
+
+
+scala> master = master.filter($"funding_round_type".isin(fil:_*))
+		master: org.apache.spark.sql.DataFrame = [funding_round_type: string, raised_amount_usd: float ... 3 more fields]
+
+scala> master.groupBy("funding_round_type").agg(avg("raised_amount_usd")).orderBy(desc("avg(raised_amount_usd)")).show
+		+------------------+----------------------+
+		|funding_round_type|avg(raised_amount_usd)|
+		+------------------+----------------------+
+		|    private_equity|   7.176788577417582E7|
+		|           venture|  1.1347619274676315E7|
+		|             angel|     971573.8929545454|
+		|              seed|     747793.6824365964|
+		+------------------+----------------------+
+
+
+scala> master.groupBy("funding_round_type").count().show
+		+------------------+-----+
+		|funding_round_type|count|
+		+------------------+-----+
+		|           venture|47809|
+		|             angel| 4400|
+		|              seed|21095|
+		|    private_equity| 1820|
+		+------------------+-----+
+
+
+scala> master = master.filter($"funding_round_type"==="venture")
+		master: org.apache.spark.sql.DataFrame = [funding_round_type: string, raised_amount_usd: float ... 3 more fields]
+
+
+
+============================================================Task 3: Country Analysis==================================================================
+================================================Analysing the countries based on investment amount====================================================
+
+
+scala> master.groupBy("country_code").agg(avg("raised_amount_usd")).orderBy(desc("avg(raised_amount_usd)")).show
+		+------------+----------------------+
+		|country_code|avg(raised_amount_usd)|
+		+------------+----------------------+
+		|         BMU|                7.22E7|
+		|         MYS|  2.9435292633333333E7|
+		|         CHN|  2.5412738220930234E7|
+		|         EGY|   2.438409090909091E7|
+		|         LUX|       2.26937923125E7|
+		|         TWN|  2.0128370741935484E7|
+		|         IND|   1.741331956166056E7|
+		|         TAN|               1.589E7|
+		|         NLD|   1.578193360326087E7|
+		|         KNA|                 1.5E7|
+		|         MAF|           1.4621592E7|
+		|         LTU|            1.434048E7|
+		|         KWT|                 1.4E7|
+		|         ARM|            1.325875E7|
+		|         ARE|  1.3177597653846154E7|
+		|         NGA|  1.3102857142857144E7|
+		|         SGP|  1.2642162244343892E7|
+		|         BRA|  1.2488236986013986E7|
+		|         MNE|                1.22E7|
+		|         PAK|              1.1875E7|
+		+------------+----------------------+
+		only showing top 20 rows
+
+
+scala> master.groupBy("country_code").count().orderBy(desc("count")).show
+		+------------+-----+
+		|country_code|count|
+		+------------+-----+
+		|         USA|35943|
+		|         GBR| 2041|
+		|         CHN| 1548|
+		|         CAN| 1246|
+		|         FRA|  912|
+		|         IND|  819|
+		|         ISR|  786|
+		|         DEU|  554|
+		|         ESP|  316|
+		|         SWE|  273|
+		|         JPN|  269|
+		|         CHE|  237|
+		|         SGP|  221|
+		|         IRL|  221|
+		|         AUS|  205|
+		|         RUS|  200|
+		|         KOR|  195|
+		|         NLD|  184|
+		|         FIN|  150|
+		|         BRA|  143|
+		+------------+-----+
+		only showing top 20 rows
+
+scala> master.groupBy("country_code").agg(sum("raised_amount_usd")).orderBy(desc("sum(raised_amount_usd)")).show
+		+------------+----------------------+
+		|country_code|sum(raised_amount_usd)|
+		+------------+----------------------+
+		|         USA|      4.02062996668E11|
+		|         CHN|       3.9338918766E10|
+		|         GBR|       2.0072813008E10|
+		|         IND|       1.4261508721E10|
+		|         CAN|          9.48221767E9|
+		|         FRA|         7.226851353E9|
+		|         ISR|         6.854350476E9|
+		|         DEU|         6.306921978E9|
+		|         JPN|         3.167647119E9|
+		|         SWE|         3.145856566E9|
+		|         NLD|         2.903875783E9|
+		|         CHE|         2.801560266E9|
+		|         SGP|         2.793917856E9|
+		|         ESP|         1.827622431E9|
+		|         BRA|         1.785817889E9|
+		|         IRL|         1.669285543E9|
+		|         RUS|         1.570426005E9|
+		|         AUS|         1.319028697E9|
+		|         DNK|         1.228310641E9|
+		|         FIN|          1.04319971E9|
+		+------------+----------------------+
+		only showing top 20 rows
+
+
+
+=====================================================creating new dataframe with highest funding countries==================================================
+
+
+scala> val top9_country = List("USA", "CHN", "GBR", "IND", "CAN", "FRA", "ISR", "DEU", "JPN")
+		top9_country: List[String] = List(USA, CHN, GBR, IND, CAN, FRA, ISR, DEU, JPN)
+
+scala> var top9 = master.filter($"country_code".isin(top9_country:_*))
+		top9: org.apache.spark.sql.Dataset[org.apache.spark.sql.Row] = [funding_round_type: string, raised_amount_usd: float ... 3 more fields]
+
+scala> top9.show(3)
+		+------------------+-----------------+--------------------+-------------+------------+
+		|funding_round_type|raised_amount_usd|                name|category_list|country_code|
+		+------------------+-----------------+--------------------+-------------+------------+
+		|           venture|            1.0E7|               #fame|        Media|         IND|
+		|           venture|        2000000.0|             0-6.com|  Curated Web|         CHN|
+		|           venture|         719491.0|Ondine Biomedical...|Biotechnology|         CAN|
+		+------------------+-----------------+--------------------+-------------+------------+
+		only showing top 3 rows
+
+
+scala> top9.groupBy("country_code").agg(sum("raised_amount_usd")).orderBy(desc("sum(raised_amount_usd)")).show
+		+------------+----------------------+
+		|country_code|sum(raised_amount_usd)|
+		+------------+----------------------+
+		|         USA|      4.02062996668E11|
+		|         CHN|       3.9338918766E10|
+		|         GBR|       2.0072813008E10|
+		|         IND|       1.4261508721E10|
+		|         CAN|          9.48221767E9|
+		|         FRA|         7.226851353E9|
+		|         ISR|         6.854350476E9|
+		|         DEU|         6.306921978E9|
+		|         JPN|         3.167647119E9|
+		+------------+----------------------+
+
+
+=========================================Identify the top three English-speaking countries in the data frame top9. 
+                                         The countires has been short listed by manual analysis of the list provided 
+                                         for english as offical lanaguage list=====================================================================
+
+
+scala> val english = List("USA", "GBR", "IND")
+		english: List[String] = List(USA, GBR, IND)
+
+scala> var top3_english = top9.filter($"country_code".isin(english:_*))
+		top3_english: org.apache.spark.sql.Dataset[org.apache.spark.sql.Row] = [funding_round_type: string, raised_amount_usd: float ... 3 more fields]
+
+scala> top3_english.show(2)
+		+------------------+-----------------+------+-------------+------------+
+		|funding_round_type|raised_amount_usd|  name|category_list|country_code|
+		+------------------+-----------------+------+-------------+------------+
+		|           venture|            1.0E7| #fame|        Media|         IND|
+		|           venture|            2.0E7|H2O.ai|    Analytics|         USA|
+		+------------------+-----------------+------+-------------+------------+
+		only showing top 2 rows
+
+scala> top3_english.groupBy("country_code").agg(sum("raised_amount_usd")).orderBy(desc("sum(raised_amount_usd)")).show
+		+------------+----------------------+
+		|country_code|sum(raised_amount_usd)|
+		+------------+----------------------+
+		|         USA|      4.02062996668E11|
+		|         GBR|       2.0072813008E10|
+		|         IND|       1.4261508721E10|
+		+------------+----------------------+
+
+
+scala> top3_english.groupBy("country_code").count().orderBy(desc("count")).show
+		+------------+-----+
+		|country_code|count|
+		+------------+-----+
+		|         USA|35943|
+		|         GBR| 2041|
+		|         IND|  819|
+		+------------+-----+
+
+
+
+======================================================================Task 4: Sector Analysis 1==============================================================
+
+
+
+scala> var mapping =spark.read.format("csv").option("header","True").option("encoding","ISO-8859-1").load("mapping.csv")
+		mapping: org.apache.spark.sql.DataFrame = [category_list: string, Automotive&Sports: string ... 8 more fields]
+
+scala> mapping.show(2)
+		+-------------+-----------------+------+------------------------+-------------+------+-------------+---------------------+------+------------------------------------+
+		|category_list|Automotive&Sports|Blanks|Cleantech/Semiconductors|Entertainment|Health|Manufacturing|News_Search_Messaging|Others|Social_Finance_Analytics_Advertising|
+		+-------------+-----------------+------+------------------------+-------------+------+-------------+---------------------+------+------------------------------------+
+		|         null|                0|     1|                       0|            0|     0|            0|                    0|     0|                                   0|
+		|           3D|                0|     0|                       0|            0|     0|            1|                    0|     0|                                   0|
+		+-------------+-----------------+------+------------------------+-------------+------+-------------+---------------------+------+------------------------------------+
+
+scala> mapping=mapping.selectExpr("category_list","stack(9,'Automotive_Sports',Automotive_Sports,'Blanks',Blanks,'Cleantech_Semiconductors',Cleantech_Semiconductors,'Entertainment',Entertainment,'Health',Health,'Manufacturing',Manufacturing,'News_Search_Messaging',News_Search_Messaging,'Social_Finance_Analytics_Advertising',Social_Finance_Analytics_Advertising,'Others',Others)").withColumnRenamed("col0","main_sector").withColumnRenamed("col1","value").filter($"value"=!=0).filter($"category_list".isNotNull)
+		mapping: org.apache.spark.sql.DataFrame = [category_list: string, main_sector: string ... 1 more field]
+
+scala> mapping.show(2)
+		+-------------+-------------+-----+
+		|category_list|  main_sector|value|
+		+-------------+-------------+-----+
+		|           3D|Manufacturing|    1|
+		|  3D Printing|Manufacturing|    1|
+		+-------------+-------------+-----+
+		only showing top 2 rows
+
+
+scala> mapping = mapping.drop("value")
+		mapping: org.apache.spark.sql.DataFrame = [category_list: string, main_sector: string]
+
+scala> mapping.show(2)
+		+-------------+-------------+
+		|category_list|  main_sector|
+		+-------------+-------------+
+		|           3D|Manufacturing|
+		|  3D Printing|Manufacturing|
+		+-------------+-------------+
+		only showing top 2 rows
+
+scala> var top3 = top3_english.join(mapping, Seq("category_list"), "left")
+		top3: org.apache.spark.sql.DataFrame = [category_list: string, funding_round_type: string ... 4 more fields]
+
+scala> 	
+		+-------------+------------------+-----------------+------+------------+--------------------+
+		|category_list|funding_round_type|raised_amount_usd|  name|country_code|         main_sector|
+		+-------------+------------------+-----------------+------+------------+--------------------+
+		|        Media|           venture|            1.0E7| #fame|         IND|       Entertainment|
+		|    Analytics|           venture|            2.0E7|H2O.ai|         USA|Social_Finance_An...|
+		|    Analytics|           venture|        1700000.0|H2O.ai|         USA|Social_Finance_An...|
+		+-------------+------------------+-----------------+------+------------+--------------------+
+		only showing top 3 rows
+
+
+
+==============================================lets drop all rows whoes investment is not between 5 and 15 million============================================
+
+
+scala> top3 = top3.filter($"raised_amount_usd"> 5000000)
+		top3: org.apache.spark.sql.DataFrame = [category_list: string, funding_round_type: string ... 4 more fields]
+
+scala> top3.show(3)
+		+-------------+------------------+-----------------+------+------------+--------------------+
+		|category_list|funding_round_type|raised_amount_usd|  name|country_code|         main_sector|
+		+-------------+------------------+-----------------+------+------------+--------------------+
+		|        Media|           venture|            1.0E7| #fame|         IND|       Entertainment|
+		|    Analytics|           venture|            2.0E7|H2O.ai|         USA|Social_Finance_An...|
+		|    Analytics|           venture|        8900000.0|H2O.ai|         USA|Social_Finance_An...|
+		+-------------+------------------+-----------------+------+------------+--------------------+
+		only showing top 3 rows
+
+
+scala> top3 = top3.filter($"raised_amount_usd"< 15000000)
+		top3: org.apache.spark.sql.DataFrame = [category_list: string, funding_round_type: string ... 4 more fields]
+
+scala> top3.show(3)
+		+--------------------+------------------+-----------------+--------------+------------+--------------------+
+		|       category_list|funding_round_type|raised_amount_usd|          name|country_code|         main_sector|
+		+--------------------+------------------+-----------------+--------------+------------+--------------------+
+		|               Media|           venture|            1.0E7|         #fame|         IND|       Entertainment|
+		|           Analytics|           venture|        8900000.0|        H2O.ai|         USA|Social_Finance_An...|
+		|Service Providers...|           venture|      1.1999347E7|128 Technology|         USA|                null|
+		+--------------------+------------------+-----------------+--------------+------------+--------------------+
+		only showing top 3 rows
+
+scala> top3 = top3.na.drop()
+		top3: org.apache.spark.sql.DataFrame = [category_list: string, funding_round_type: string ... 4 more fields]
+
+scala> var d1 = top3.filter($"country_code"==="USA")
+		d1: org.apache.spark.sql.Dataset[org.apache.spark.sql.Row] = [category_list: string, funding_round_type: string ... 4 more fields]
+
+scala> var d2 = top3.filter($"country_code"==="GBR")
+		d2: org.apache.spark.sql.Dataset[org.apache.spark.sql.Row] = [category_list: string, funding_round_type: string ... 4 more fields]
+
+scala> var d3 = top3.filter($"country_code"==="IND")
+		d3: org.apache.spark.sql.Dataset[org.apache.spark.sql.Row] = [category_list: string, funding_round_type: string ... 4 more fields]
+
+scala> d1.groupBy("main_sector").agg(sum("raised_amount_usd")).orderBy(desc("sum(raised_amount_usd)")).show
+		+--------------------+----------------------+
+		|         main_sector|sum(raised_amount_usd)|
+		+--------------------+----------------------+
+		|              Others|       1.5547311462E10|
+		|Cleantech_Semicon...|       1.3575987578E10|
+		|              Health|         4.490749916E9|
+		|News_Search_Messa...|         3.865547632E9|
+		|Social_Finance_An...|         3.690731379E9|
+		|       Manufacturing|         3.218864507E9|
+		|       Entertainment|         1.378119994E9|
+		|   Automotive_Sports|          2.86202844E8|
+		+--------------------+----------------------+
+
+
+scala> d2.groupBy("main_sector").agg(sum("raised_amount_usd")).orderBy(desc("sum(raised_amount_usd)")).show
+		+--------------------+----------------------+
+		|         main_sector|sum(raised_amount_usd)|
+		+--------------------+----------------------+
+		|Cleantech_Semicon...|          9.17829246E8|
+		|              Others|          8.16205523E8|
+		|News_Search_Messa...|          2.69140008E8|
+		|       Entertainment|          2.45461478E8|
+		|       Manufacturing|          2.37049312E8|
+		|Social_Finance_An...|          1.99507606E8|
+		|              Health|          1.07740187E8|
+		|   Automotive_Sports|           2.9352177E7|
+		+--------------------+----------------------+
+
+
+scala> d3.groupBy("main_sector").agg(sum("raised_amount_usd")).orderBy(desc("sum(raised_amount_usd)")).show
+		+--------------------+----------------------+
+		|         main_sector|sum(raised_amount_usd)|
+		+--------------------+----------------------+
+		|              Others|          5.20169507E8|
+		|News_Search_Messa...|           2.2211877E8|
+		|Social_Finance_An...|           1.4360605E8|
+		|              Health|              1.0454E8|
+		|       Entertainment|               9.615E7|
+		|       Manufacturing|                8.67E7|
+		|Cleantech_Semicon...|               8.518E7|
+		|   Automotive_Sports|             6400000.0|
+		+--------------------+----------------------+
+
+
+scala> d1.groupBy("main_sector").count().orderBy(desc("count")).show
+		+--------------------+-----+
+		|         main_sector|count|
+		+--------------------+-----+
+		|              Others| 1728|
+		|Cleantech_Semicon...| 1494|
+		|              Health|  498|
+		|News_Search_Messa...|  449|
+		|Social_Finance_An...|  421|
+		|       Manufacturing|  353|
+		|       Entertainment|  158|
+		|   Automotive_Sports|   35|
++--------------------+-----+
+
+
+scala> d2.groupBy("main_sector").count().orderBy(desc("count")).show
+		+--------------------+-----+
+		|         main_sector|count|
+		+--------------------+-----+
+		|Cleantech_Semicon...|  104|
+		|              Others|   95|
+		|News_Search_Messa...|   30|
+		|       Manufacturing|   27|
+		|       Entertainment|   27|
+		|Social_Finance_An...|   23|
+		|              Health|   12|
+		|   Automotive_Sports|    3|
+		+--------------------+-----+
+
+
+scala> d3.groupBy("main_sector").count().orderBy(desc("count")).show
+		+--------------------+-----+
+		|         main_sector|count|
+		+--------------------+-----+
+		|              Others|   57|
+		|News_Search_Messa...|   24|
+		|Social_Finance_An...|   17|
+		|              Health|   11|
+		|       Entertainment|   11|
+		|Cleantech_Semicon...|   10|
+		|       Manufacturing|    9|
+		|   Automotive_Sports|    1|
+		+--------------------+-----+
+
+
+
+
+
+=================================================================== Codes ====================================================================================
+
+
+=====================================================Task 1: Reading, merging and Data cleaning=========================================================
+
+var companies = spark.read.format("csv").option("sep","\t").option("header","True").option("encoding","ISO-8859-1").load("companies.txt")
+
+companies = companies.withColumn("permalink",lower(col("permalink")))
+
+companies.select("permalink").distinct.count()
+
+var rounds =spark.read.format("csv").option("header","True").option("encoding","ISO-8859-1").load("rounds2.csv")
+
+rounds = rounds.withColumn("company_permalink",lower(col("company_permalink")))
+
+rounds.select("company_permalink").distinct.count()
+
+rounds = rounds.withColumnRenamed("company_permalink","permalink")
+
+var master_frame = rounds.join(companies, Seq("permalink"), "inner")
+
+var master = master_frame.drop("funding_round_code", "funding_round_permalink", "funded_at","permalink", "homepage_url","state_code","region", "city", "founded_at","status")
+
+master.count()
+
+master = master.na.drop()
+
+master.count()
+
+====================================================Task 2: Funding Type Analysis==========================================================================
+==================================================== Observing the unique funding_round_type ==============================================================
+
+master.groupBy("funding_round_type").count().orderBy(desc("count")).show
+
+master = master.withColumn("raised_amount_usd",$"raised_amount_usd".cast("float"))
+
+master.groupBy("funding_round_type").agg(sum("raised_amount_usd")).orderBy(desc("sum(raised_amount_usd)")).show
+
+master.groupBy("funding_round_type").agg(avg("raised_amount_usd")).orderBy(desc("avg(raised_amount_usd)")).show
+
+val fil = List("venture", "angel", "seed", "private_equity")
+
+master.filter($"funding_round_type".isin(fil:_*)).show(3)
+
+master.groupBy("funding_round_type").agg(avg("raised_amount_usd")).orderBy(desc("avg(raised_amount_usd)")).show
+
+master.groupBy("funding_round_type").count().show
+
+master = master.filter($"funding_round_type"==="venture")
+
+======================================================================Task 3: Country Analysis==============================================================
+====================================================creating new dataframe with highest funding countries====================================================
+
+master.groupBy("country_code").agg(avg("raised_amount_usd")).orderBy(desc("avg(raised_amount_usd)")).show
+
+master.groupBy("country_code").count().orderBy(desc("count")).show
+
+master.groupBy("country_code").agg(sum("raised_amount_usd")).orderBy(desc("sum(raised_amount_usd)")).show
+
+val top9_country = List("USA", "CHN", "GBR", "IND", "CAN", "FRA", "ISR", "DEU", "JPN")
+
+var top9 = master.filter($"country_code".isin(top9_country:_*))
+
+top9.groupBy("country_code").agg(sum("raised_amount_usd")).orderBy(desc("sum(raised_amount_usd)")).show
+
+
+=========================================Identify the top three English-speaking countries in the data frame top9. 
+                                         The countires has been short listed by manual analysis of the list provided 
+                                         for english as offical lanaguage list=====================================================================
+
+val english = List("USA", "GBR", "IND")
+
+var top3_english = top9.filter($"country_code".isin(english:_*))
+
+top3_english.show(2)
+
+top3_english.groupBy("country_code").agg(sum("raised_amount_usd")).orderBy(desc("sum(raised_amount_usd)")).show
+
+top3_english.groupBy("country_code").count().orderBy(desc("count")).show
+
+
+======================================================================Task 4: Sector Analysis 1==============================================================
+
+
+var mapping = spark.read.format("csv").option("header","True").option("encoding","ISO-8859-1").load("mapping.csv")
+
+mapping = mapping.selectExpr("category_list","stack(9,'Automotive_Sports',Automotive_Sports,'Blanks',Blanks,'Cleantech_Semiconductors',Cleantech_Semiconductors,'Entertainment',Entertainment,'Health',Health,'Manufacturing',Manufacturing,'News_Search_Messaging',News_Search_Messaging,'Social_Finance_Analytics_Advertising',Social_Finance_Analytics_Advertising,'Others',Others)").withColumnRenamed("col0","main_sector").withColumnRenamed("col1","value").filter($"value"=!=0).filter($"category_list".isNotNull)
+
+mapping = mapping.drop("value")
+
+var top3 = top3_english.join(mapping, Seq("category_list"), "left")
+
+
+====================================Drop all rows whoes investment is not between 5 and 15 million======================================================
+
+top3 = top3.filter($"raised_amount_usd"> 5000000)
+
+top3 = top3.filter($"raised_amount_usd"< 15000000)
+
+top3 = top3.na.drop()
+
+var d1 = top3.filter($"country_code"==="USA")
+
+var d2 = top3.filter($"country_code"==="GBR")
+
+var d3 = top3.filter($"country_code"==="IND")
+
+d1.groupBy("main_sector").agg(sum("raised_amount_usd")).orderBy(desc("sum(raised_amount_usd)")).show
+
+d2.groupBy("main_sector").agg(sum("raised_amount_usd")).orderBy(desc("sum(raised_amount_usd)")).show
+
+d3.groupBy("main_sector").agg(sum("raised_amount_usd")).orderBy(desc("sum(raised_amount_usd)")).show
+
+d1.groupBy("main_sector").count().orderBy(desc("count")).show
+
+d2.groupBy("main_sector").count().orderBy(desc("count")).show
+
+d3.groupBy("main_sector").count().orderBy(desc("count")).show
+
+
+
+
+
+
+
+
+
+
+
+============================================================================================================================================================================================================================================================================================================================
+
+master_frame.withColumn("permalink",col("funding_round_code").isNull).show()
+
+
+##replaces column with foo
+companies.withColumn("permalink",lit("foo")).show
