@@ -10,16 +10,9 @@ In this work, an analysis on the previously available investment data is perform
 # Dataset Description:
 The dataset is based on the real time investment data taken from crunchbase.com [1, 2, 3]. The dataset has three data files. The company details with basic data on companies are available in companies.txt. The funding round details are present in rounds2.csv. Finally the different sector based classification of data is available in mapping.csv, which maps various category names in company’s data such as 3D printing, aerospace, agriculture, etc to eight broad sector names.  Each of these data files are explained in detail in tables [1-3]
 
-Attribute	Description
-Permalink	Unique ID of company
-name	Company name
-homepage_url	Website URL
-category_list	Category/categories to which a company belongs
-status	Operational status
-country_code	Country Code
-state_code	State
-
+![image](https://user-images.githubusercontent.com/41851165/69604818-84335a80-1044-11ea-847f-ed1ce547732f.png)
 Table 1: Company details in companies.txt file
+
 Attributes	Description
 company_permalink	Unique ID of company
 funding_round_permalink	Unique ID of funding round
