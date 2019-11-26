@@ -10,26 +10,15 @@ In this work, an analysis on the previously available investment data is perform
 # Dataset Description:
 The dataset is based on the real time investment data taken from crunchbase.com [1, 2, 3]. The dataset has three data files. The company details with basic data on companies are available in companies.txt. The funding round details are present in rounds2.csv. Finally the different sector based classification of data is available in mapping.csv, which maps various category names in company’s data such as 3D printing, aerospace, agriculture, etc to eight broad sector names.  Each of these data files are explained in detail in tables [1-3]
 
-![image](https://user-images.githubusercontent.com/41851165/69604818-84335a80-1044-11ea-847f-ed1ce547732f.png)
+![image](https://user-images.githubusercontent.com/41851165/69604895-bf358e00-1044-11ea-9205-a0263500f9e1.png)
+
 Table 1: Company details in companies.txt file
 
-Attributes	Description
-company_permalink	Unique ID of company
-funding_round_permalink	Unique ID of funding round
-funding_round_type	Type of funding – venture, angel, private equity etc.
-funding_round_code	Round of venture funding (round A, B etc.)
-funded_at	Date of funding
-raised_amount_usd	Money raised in funding (USD)
+![image](https://user-images.githubusercontent.com/41851165/69604952-dbd1c600-1044-11ea-8c26-d3f982ee7a7c.png)
 
-Table 2: Funding rounds details in rounds.csv file
+![image](https://user-images.githubusercontent.com/41851165/69604980-f146f000-1044-11ea-911a-5fa372e727d5.png)
 
-Attributes	Description
-Category_list	Category/ categories to which company belongs
-Main sector	Eight main sectors such as Automotive&Sports, Blanks, Cleantech/Semiconductors, Entertainment, Health, Manufacturing, News_Search_Messaging, Others, Social_Finance_Analytics_Advertising
-
-Table 3: Sector based classification of data in mapping.csv file.
-
-Methodology:
+# Methodology:
 The mail goal of this work is to identify best sectors, countries and a suitable investment type for making investments. The analysis is done in three different stages as follows:
 
 1.	Investment type analysis: 
